@@ -18,9 +18,10 @@
 
 package pi_sugar
 
-import "github.com/peergum/go-rpio/v4"
-
-//import rpio "github.com/peergum/go-rpio/v5"
+import (
+	"github.com/peergum/go-rpio/v5"
+	"log"
+)
 
 type PiSugar struct {
 	voltage  int
@@ -34,10 +35,24 @@ var (
 	piSugar PiSugar
 )
 
-func NewPiSugar() (*PiSugar, error) {
-	if err := rpio.I2cBegin(rpio.I2c1); err != nil {
-		return nil, err
+func Init() error {
+	if err := rpio.Open(); err != nil {
+		log.Printf("Can't open rpio %v", err)
+		return err
 	}
+
+	if err := rpio.I2cBegin(rpio.I2c1); err != nil {
+		log.Printf("Can't start I2C %v", err)
+		return err
+	}
+	return nil
+}
+
+func End() {
+	rpio.I2cEnd(rpio.I2c1)
+}
+
+func NewPiSugar() (*PiSugar, error) {
 	return &piSugar, nil
 }
 
