@@ -1,4 +1,4 @@
-module github.com/peergum/go-pisugar
+module github.com/peergum/pi_sugar
 
 go 1.22
 
