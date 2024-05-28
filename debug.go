@@ -28,7 +28,7 @@ var (
 )
 
 func init() {
-	flag.BoolVar(&debug, "dsugar", true, "debug mode for pi sugar module")
+	flag.BoolVar(&debug, "dsugar", false, "debug mode for pi sugar module")
 }
 
 func Debug(format string, args ...interface{}) {
