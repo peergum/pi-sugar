@@ -40,11 +40,25 @@ const (
 	temperatureReg   = 0x04
 	voltageReg       = 0x22
 	batteryChargeReg = 0x2a
-	chargingStatusReg
+	//chargingStatusReg
+	secondsInAMinute = 60
+	minutesInAnHour  = 60
+	hoursInADay      = 24
+	numberOfDays     = 7
 )
 
 var (
-	piSugar PiSugar
+	piSugar               PiSugar
+	lastMinuteCharge      []int     = make([]int, 0, secondsInAMinute)
+	lastHourCharge        []float64 = make([]float64, 0, minutesInAnHour)
+	lastDayCharge         []float64 = make([]float64, 0, hoursInADay*numberOfDays)
+	lastMinuteVoltage     []float64 = make([]float64, 0, secondsInAMinute)
+	lastHourVoltage       []float64 = make([]float64, 0, minutesInAnHour)
+	lastDayVoltage        []float64 = make([]float64, 0, hoursInADay*numberOfDays)
+	lastMinuteTemperature []int     = make([]int, 0, secondsInAMinute)
+	lastHourTemperature   []float64 = make([]float64, 0, minutesInAnHour)
+	lastDayTemperature    []float64 = make([]float64, 0, hoursInADay*numberOfDays)
+	counter               int
 )
 
 func Init() (err error) {
@@ -86,19 +100,78 @@ func (piSugar *PiSugar) Power() bool {
 	return piSugar.power
 }
 
+func appendInt(table []int, value int, maxSize int) []int {
+	firstElement := 0
+	if len(table) == maxSize {
+		firstElement = 1
+	}
+	table = append(table[firstElement:], value)
+	return table
+}
+
+func appendFloat64(table []float64, value float64, maxSize int) []float64 {
+	firstElement := 0
+	if len(table) == maxSize {
+		firstElement = 1
+	}
+	table = append(table[firstElement:], value)
+	return table
+}
+
+func avgInt(table []int) (avg float64) {
+	for _, v := range table {
+		avg += float64(v)
+	}
+	return avg / float64(len(table))
+}
+
+func avgFloat64(table []float64) (avg float64) {
+	for _, v := range table {
+		avg += v
+	}
+	return avg / float64(len(table))
+}
+
 func (piSugar *PiSugar) Refresh() {
 	var buf []byte = make([]byte, 2)
+	counter++
+
+	// we keep history of each variable
+	// 60 last seconds
+	// 60 last minutes
+	// "numberOfDays" last days
 	code := piSugar.I2cReadRegister(temperatureReg, buf, 1)
 	if code == 0 {
-		piSugar.temperature = int(buf[0]) - 40
+		lastMinuteTemperature = appendInt(lastMinuteTemperature, int(buf[0])-40, secondsInAMinute)
+		piSugar.temperature = int(avgInt(lastMinuteTemperature))
+		if counter%60 == 0 {
+			lastHourTemperature = appendFloat64(lastHourTemperature, avgInt(lastMinuteTemperature), minutesInAnHour)
+			if counter%1440 == 0 {
+				lastDayTemperature = appendFloat64(lastDayTemperature, avgFloat64(lastHourTemperature), numberOfDays*hoursInADay)
+			}
+		}
 	}
 	code = piSugar.I2cReadRegister(voltageReg, buf, 2)
 	if code == 0 {
-		piSugar.voltage = float64(uint16(buf[0])<<8|uint16(buf[1])) / 1000
+		lastMinuteVoltage = appendFloat64(lastMinuteVoltage, float64(uint16(buf[0])<<8|uint16(buf[1]))/1000, secondsInAMinute)
+		piSugar.voltage = avgFloat64(lastMinuteVoltage)
+		if counter%60 == 0 {
+			lastHourVoltage = appendFloat64(lastHourVoltage, avgFloat64(lastMinuteVoltage), minutesInAnHour)
+			if counter%1440 == 0 {
+				lastDayVoltage = appendFloat64(lastDayVoltage, avgFloat64(lastHourVoltage), numberOfDays*hoursInADay)
+			}
+		}
 	}
 	code = piSugar.I2cReadRegister(batteryChargeReg, buf, 1)
 	if code == 0 {
-		piSugar.charge = int(buf[0])
+		lastMinuteCharge = appendInt(lastMinuteCharge, int(buf[0]), secondsInAMinute)
+		piSugar.charge = int(avgInt(lastMinuteCharge))
+		if counter%60 == 0 {
+			lastHourCharge = appendFloat64(lastHourCharge, avgInt(lastMinuteCharge), minutesInAnHour)
+			if counter%1440 == 0 {
+				lastDayCharge = appendFloat64(lastDayCharge, avgFloat64(lastHourCharge), numberOfDays*hoursInADay)
+			}
+		}
 	}
 	code = piSugar.I2cReadRegister(powerReg, buf, 1)
 	if code == 0 {
