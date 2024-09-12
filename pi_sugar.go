@@ -19,7 +19,8 @@
 package pi_sugar
 
 import (
-	"github.com/peergum/go-rpio/v5"
+	"fmt"
+	rpio "github.com/peergum/go-rpio/v5"
 	"log"
 )
 
@@ -59,9 +60,11 @@ var (
 	lastHourTemperature   []float64 = make([]float64, 0, minutesInAnHour)
 	lastDayTemperature    []float64 = make([]float64, 0, hoursInADay*numberOfDays)
 	counter               int
+	isPresent             = false
 )
 
 func Init() (err error) {
+	return fmt.Errorf("Not initializing pi-sugar")
 	if err = rpio.Open(); err != nil {
 		log.Printf("Can't open rpio %v", err)
 		return err
@@ -72,6 +75,7 @@ func Init() (err error) {
 		return err
 	}
 	piSugar.I2cSetSlaveAddress(0x57)
+	isPresent = true
 	//piSugar.I2cSetBaudrate(110000)
 	return nil
 }
@@ -133,6 +137,9 @@ func avgFloat64(table []float64) (avg float64) {
 }
 
 func (piSugar *PiSugar) Refresh() {
+	if !isPresent {
+		return
+	}
 	var buf []byte = make([]byte, 2)
 	counter++
 
